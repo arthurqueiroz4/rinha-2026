@@ -119,26 +119,18 @@ func searchAux(tree *VPTree, idx uint32, query *[14]int16, rb *PriorityQueue) {
 		return
 	}
 
-	var diff uint16
-	if dist > node.Threshold {
-		diff = dist - node.Threshold
-	} else {
-		diff = node.Threshold - dist
-	}
-
 	if dist <= node.Threshold {
 		if node.Left != noChildIdx {
 			searchAux(tree, node.Left, query, rb)
 		}
-
-		if node.Right != noChildIdx && diff < rb.max() {
+		if node.Right != noChildIdx && dist + rb.max() >= node.Threshold {
 			searchAux(tree, node.Right, query, rb)
 		}
 	} else {
 		if node.Right != noChildIdx {
 			searchAux(tree, node.Right, query, rb)
 		}
-		if node.Left != noChildIdx && diff < rb.max() {
+		if node.Left != noChildIdx && dist - rb.max() >= node.Threshold {
 			searchAux(tree, node.Left, query, rb)
 		}
 	}
