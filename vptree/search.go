@@ -1,5 +1,7 @@
 package vptree
 
+import "math"
+
 type Result struct {
 	Idx      uint32
 	Distance uint16
@@ -44,6 +46,9 @@ func (pq *PriorityQueue) Add(idx uint32, dist uint16) {
 }
 
 func (pq *PriorityQueue) max() uint16 {
+	if pq.count < 5 {
+		return math.MaxUint16
+	}
 	return pq.candidates[pq.farthestCandidate].Distance
 }
 
@@ -119,18 +124,18 @@ func searchAux(tree *VPTree, idx uint32, query *[14]int16, rb *PriorityQueue) {
 		return
 	}
 
-	if dist <= node.Threshold {
+	if dist < node.Threshold {
 		if node.Left != noChildIdx {
 			searchAux(tree, node.Left, query, rb)
 		}
-		if node.Right != noChildIdx && dist + rb.max() >= node.Threshold {
+		if node.Right != noChildIdx && dist+rb.max() >= node.Threshold {
 			searchAux(tree, node.Right, query, rb)
 		}
 	} else {
 		if node.Right != noChildIdx {
 			searchAux(tree, node.Right, query, rb)
 		}
-		if node.Left != noChildIdx && dist - rb.max() >= node.Threshold {
+		if node.Left != noChildIdx && dist-rb.max() <= node.Threshold {
 			searchAux(tree, node.Left, query, rb)
 		}
 	}

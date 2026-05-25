@@ -1,26 +1,28 @@
 package vptree
 
 import (
-	"math/rand/v2"
 	"slices"
 
 	"rinha2026/model"
 )
 
 func Build(vectors []model.ReferenceQuantized) *VPTree {
-	rand.Shuffle(len(vectors), func(i, j int) {
-		vectors[i], vectors[j] = vectors[j], vectors[i]
-	})
+	// rand.Shuffle(len(vectors), func(i, j int) {
+	// 	vectors[i], vectors[j] = vectors[j], vectors[i]
+	// })
 	nodes := make([]Node, len(vectors))
-	buildAux(nodes, vectors, 0)
+	var idx uint32
+	buildAux(nodes, vectors, &idx)
 	return &VPTree{Nodes: nodes}
 }
 
 // buildAux constrói recursivamente a VP-tree.
-func buildAux(nodes []Node, vectors []model.ReferenceQuantized, idx uint32) uint32 {
+func buildAux(nodes []Node, vectors []model.ReferenceQuantized, idx *uint32) uint32 {
+	current := *idx
+	*idx++
 	if len(vectors) == 1 {
-		nodes[idx] = newLeafNode(vectors[0])
-		return idx + 1
+		nodes[current] = newLeafNode(vectors[0])
+		return current
 	}
 
 	vantagePoint := vectors[0]
@@ -47,20 +49,16 @@ func buildAux(nodes []Node, vectors []model.ReferenceQuantized, idx uint32) uint
 
 	threshold := distances[median].Distance
 
-	nextIdx := idx + 1
-
-	var leftChild, rightChild = noChildIdx, noChildIdx
+	leftChild, rightChild := noChildIdx, noChildIdx
 	if len(leftRaw) > 0 {
-		leftChild = nextIdx
-		nextIdx = buildAux(nodes, leftRaw, nextIdx)
+		leftChild = buildAux(nodes, leftRaw, idx)
 	}
 	if len(rightRaw) > 0 {
-		rightChild = nextIdx
-		nextIdx = buildAux(nodes, rightRaw, nextIdx)
+		rightChild = buildAux(nodes, rightRaw, idx)
 	}
 
-	nodes[idx] = newNode(
+	nodes[current] = newNode(
 		uint32(leftChild), uint32(rightChild), vantagePoint, threshold,
 	)
-	return nextIdx
+	return current
 }

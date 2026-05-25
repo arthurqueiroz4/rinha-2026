@@ -5,6 +5,7 @@ import (
 	"os"
 	"runtime"
 	"slices"
+	"time"
 
 	"rinha2026/model"
 	"rinha2026/quantization"
@@ -40,46 +41,46 @@ func LoadMccRisk(path string) (map[string]float64, error) {
 	return m, nil
 }
 
-func clamp(v, max float64) float64 {
-	if v > max {
-		return max
+func clamp(v float64) float64 {
+	if v > 1.0 {
+		return 1.0
 	}
 	if v < 0 {
 		return 0
 	}
-	return v / max
+	return v
 }
 
 func ToVectorQuantized(req model.FraudScoreRequest, p model.Params, mccRisk map[string]float64) [14]int16 {
 	var result [14]int16
 
-	result[0] = quantizeField(clamp(req.Transaction.Amount, p.MaxAmount))
-	result[1] = quantizeField(clamp(req.Transaction.Installments, p.MaxInstallments))
+	result[0] = quantizeField(clamp(req.Transaction.Amount / p.MaxAmount))
+	result[1] = quantizeField(clamp(req.Transaction.Installments / p.MaxInstallments))
 
 	if req.Customer.AverageAmount > 0 {
-		result[2] = quantizeField(clamp(req.Transaction.Amount/req.Customer.AverageAmount, p.AmountVsAvgRatio))
+		result[2] = quantizeField(clamp(req.Transaction.Amount / req.Customer.AverageAmount / p.AmountVsAvgRatio))
 	} else {
 		result[2] = 0
 	}
 
-	weekday := float64(req.Transaction.RequestedAt.Weekday())
-	result[3] = quantizeField(clamp(weekday, 6))
-
 	hour := float64(req.Transaction.RequestedAt.Hour())
-	result[4] = quantizeField(clamp(hour, 23))
+	result[3] = quantizeField(clamp(hour / 23))
+
+	weekday := float64(getWeekDay(req.Transaction.RequestedAt))
+	result[4] = quantizeField(clamp(weekday / 6))
 
 	if req.LastTransaction != nil {
 		minutes := req.Transaction.RequestedAt.Sub(req.LastTransaction.Timestamp).Minutes()
-		result[5] = quantizeField(clamp(minutes, p.MaxMinutes))
-		result[6] = quantizeField(clamp(req.LastTransaction.KmFromCurrent, p.MaxKm))
+		result[5] = quantizeField(clamp(minutes / p.MaxMinutes))
+		result[6] = quantizeField(clamp(req.LastTransaction.KmFromCurrent / p.MaxKm))
 	} else {
-		result[5] = -1
-		result[6] = -1
+		result[5] = quantizeField(-1)
+		result[6] = quantizeField(-1)
 	}
 
-	result[7] = quantizeField(clamp(req.Terminal.KmFromHome, p.MaxKm))
+	result[7] = quantizeField(clamp(req.Terminal.KmFromHome / p.MaxKm))
 
-	result[8] = quantizeField(clamp(req.Customer.TxCount24H, p.MaxTxCount24h))
+	result[8] = quantizeField(clamp(req.Customer.TxCount24H / p.MaxTxCount24h))
 
 	result[9] = quantizeBool(req.Terminal.IsOnline)
 	result[10] = quantizeBool(req.Terminal.CardPresent)
@@ -93,7 +94,7 @@ func ToVectorQuantized(req model.FraudScoreRequest, p model.Params, mccRisk map[
 	}
 	result[12] = quantizeField(mccRiskValue)
 
-	result[13] = quantizeField(clamp(req.Merchant.AverageAmount, p.MaxMerchantAvgAmount))
+	result[13] = quantizeField(clamp(req.Merchant.AverageAmount / p.MaxMerchantAvgAmount))
 
 	return result
 }
@@ -107,4 +108,12 @@ func quantizeBool(b bool) int16 {
 		return quantization.Quantize(1.0)
 	}
 	return quantization.Quantize(0.0)
+}
+
+func getWeekDay(d time.Time) float64 {
+	wd := d.Weekday()
+	if wd == 0 {
+		return 6
+	}
+	return float64(wd) - 1
 }
